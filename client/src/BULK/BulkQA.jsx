@@ -1,82 +1,78 @@
 import { useState } from "react";
 import axios from "axios";
 
-function BulkQA() {
-  const [contentPdf, setContentPdf] = useState(null);
-  const [questionsPdf, setQuestionsPdf] = useState(null);
-  const [bulkAnswers, setBulkAnswers] = useState([]);
-  const [bulkLoading, setBulkLoading] = useState(false);
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-  const handleBulkQA = async () => {
-    if (!contentPdf || !questionsPdf) {
-      alert("Please upload both PDFs.");
-      return;
+function BulkQA() {
+  const [contentFile, setContentFile] = useState(null);
+  const [questionsFile, setQuestionsFile] = useState(null);
+  const [bulkAnswers, setBulkAnswers] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const handleBulkUpload = async () => {
+    if (!contentFile || !questionsFile) {
+      return alert("Please select both content and question PDF files.");
     }
 
     const formData = new FormData();
-    formData.append("contentPdf", contentPdf);
-    formData.append("questionsPdf", questionsPdf);
+    formData.append("contentPdf", contentFile);
+    formData.append("questionsPdf", questionsFile);
 
     try {
-      setBulkLoading(true);
-      const res = await axios.post("http://localhost:5000/bulk-qa", formData);
+      setLoading(true);
+      const res = await axios.post(`${BASE_URL}/bulk-qa`, formData);
       setBulkAnswers(res.data.answers || []);
     } catch (err) {
-      console.error(err);
       alert("Something went wrong during bulk Q&A.");
+      console.error(err);
     } finally {
-      setBulkLoading(false);
+      setLoading(false);
     }
   };
 
   return (
     <div className="mt-10 border-t pt-6">
-      <h2 className="text-xl font-bold text-blue-600 mb-4">
-        📂 Upload Document & Questions PDFs
-      </h2>
+      <h2 className="text-xl font-semibold text-gray-700 mb-4">📚 Bulk Q&A</h2>
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          📘 Document PDF:
-        </label>
+      <div className="space-y-3">
         <input
           type="file"
           accept=".pdf"
-          onChange={(e) => setContentPdf(e.target.files[0])}
-          className="w-full border px-3 py-2 rounded"
+          onChange={(e) => setContentFile(e.target.files[0])}
+          className="w-full border border-gray-300 rounded px-3 py-2"
         />
-      </div>
+        <p className="text-sm text-gray-500">
+          📄 Upload <b>Document PDF</b>
+        </p>
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          ❓ Questions PDF:
-        </label>
         <input
           type="file"
           accept=".pdf"
-          onChange={(e) => setQuestionsPdf(e.target.files[0])}
-          className="w-full border px-3 py-2 rounded"
+          onChange={(e) => setQuestionsFile(e.target.files[0])}
+          className="w-full border border-gray-300 rounded px-3 py-2"
         />
-      </div>
+        <p className="text-sm text-gray-500">
+          ❓ Upload <b>Questions PDF</b>
+        </p>
 
-      <button
-        onClick={handleBulkQA}
-        className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-      >
-        {bulkLoading ? "Processing..." : "Get Answers"}
-      </button>
+        <button
+          onClick={handleBulkUpload}
+          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+          disabled={loading}
+        >
+          {loading ? "Processing..." : "Submit for Bulk Q&A"}
+        </button>
+      </div>
 
       {bulkAnswers.length > 0 && (
-        <div className="mt-6 space-y-3">
-          <h3 className="text-lg font-semibold text-gray-800">📄 Auto-Generated Q&A:</h3>
-          <div className="max-h-72 overflow-y-auto space-y-2">
-            {bulkAnswers.map((qa, index) => (
-              <div key={index} className="p-3 bg-gray-100 rounded border">
-                <p className="font-medium text-gray-800">❓ {qa.question}</p>
-                <p className="text-sm text-gray-700 mt-1">💡 {qa.answer}</p>
-              </div>
-            ))}
-          </div>
+        <div className="mt-6 space-y-4 max-h-64 overflow-y-auto">
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">📝 Answers:</h3>
+          {bulkAnswers.map((item, idx) => (
+            <div key={idx} className="p-3 bg-gray-50 border rounded">
+              <p className="font-medium text-gray-800">❓ {item.question}</p>
+              <p className="text-sm text-gray-700 mt-1">💡 {item.answer}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>

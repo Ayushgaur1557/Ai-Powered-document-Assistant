@@ -18,13 +18,13 @@ function App() {
     if (!file) return alert("Please select a PDF file.");
     const formData = new FormData();
     formData.append("file", file);
-  
+
     try {
       setLoading(true);
-  
+
       // 🟡 Warm-up: ping backend before sending actual upload request
       await axios.get(`${BASE_URL}`);
-  
+
       // 🟢 Now send the real request
       const res = await axios.post(`${BASE_URL}/upload`, formData);
       setSummary(res.data.summary);
@@ -119,9 +119,7 @@ function App() {
         {summary && (
           <>
             <div className="mt-6">
-              <h2 className="text-xl font-semibold mb-2 text-gray-700">
-                📌 Summary:
-              </h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-700">📌 Summary:</h2>
               <div className="bg-gray-50 p-4 rounded-md border border-gray-200 max-h-60 overflow-y-auto text-sm text-gray-800 whitespace-pre-wrap">
                 {summary}
               </div>
@@ -134,16 +132,21 @@ function App() {
             </div>
 
             <div className="mt-6">
-              <h2 className="text-lg font-semibold mb-1 text-gray-700">
-                ❓ Ask a question:
-              </h2>
-              <input
-                type="text"
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Type your question..."
-                className="w-full border px-3 py-2 rounded mb-2"
-              />
+              <h2 className="text-lg font-semibold mb-1 text-gray-700">❓ Ask a question:</h2>
+
+              {/* ✅ Updated input styling */}
+         <input
+  type="text"
+  value={question}
+  onChange={(e) => setQuestion(e.target.value)}
+  placeholder="Type your question..."
+  className="w-full px-4 py-2 mb-2 rounded border border-gray-400 bg-white text-black placeholder-gray-500"
+/>
+
+
+
+
+
               <button
                 onClick={handleAsk}
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
@@ -160,9 +163,7 @@ function App() {
 
               {qaHistory.length > 0 && (
                 <div className="mt-4">
-                  <h3 className="text-md font-semibold text-gray-700 mb-2">
-                    💬 Q&A History
-                  </h3>
+                  <h3 className="text-md font-semibold text-gray-700 mb-2">💬 Q&A History</h3>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
                     {qaHistory.map((qa, index) => (
                       <div key={index} className="p-3 bg-gray-100 rounded border">
@@ -184,6 +185,7 @@ function App() {
       </div>
     </div>
   );
+
 }
 
 export default App;
