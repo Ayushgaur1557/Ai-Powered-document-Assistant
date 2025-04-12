@@ -11,9 +11,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.send("🟢 Backend is live and ready!");
+});
+
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 //post method
+
 
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
