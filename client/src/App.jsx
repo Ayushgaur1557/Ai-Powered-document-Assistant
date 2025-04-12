@@ -3,35 +3,30 @@ import axios from "axios";
 import { jsPDF } from "jspdf";
 import BulkQA from "./BULK/BulkQA";
 
+// 💡 Your backend URL from Vercel environment variable
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function App() {
-  
-  // this is for file input
   const [file, setFile] = useState(null);
-
-  //this is for summery
   const [summary, setSummary] = useState("");
-
-  // this is for whether it is summerizing or uploading file
   const [loading, setLoading] = useState(false);
-
-  //this is for question
   const [question, setQuestion] = useState("");
-  //this is for question history
   const [qaHistory, setQaHistory] = useState([]);
   const [qaLoading, setQaLoading] = useState(false);
-
-
-
 
   const handleUpload = async () => {
     if (!file) return alert("Please select a PDF file.");
     const formData = new FormData();
     formData.append("file", file);
-
+  
     try {
       setLoading(true);
-      const res = await axios.post("http://localhost:5000/upload", formData);
+  
+      // 🟡 Warm-up: ping backend before sending actual upload request
+      await axios.get(`${BASE_URL}`);
+  
+      // 🟢 Now send the real request
+      const res = await axios.post(`${BASE_URL}/upload`, formData);
       setSummary(res.data.summary);
     } catch (err) {
       alert("Something went wrong while summarizing.");
@@ -61,7 +56,7 @@ function App() {
     if (!question.trim()) return alert("Please enter a question.");
     setQaLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/ask", {
+      const res = await axios.post(`${BASE_URL}/ask`, {
         context: summary,
         question,
       });
@@ -71,16 +66,18 @@ function App() {
         answer: res.data.answer || "No answer found in the document.",
       };
 
-      setQaHistory([...qaHistory, newQA]);
+      setQaHistory((prev) => [...prev, newQA]);
       setQuestion(""); // Clear input
     } catch (err) {
       console.error(err);
-      setQaHistory([...qaHistory, { question, answer: "Error getting answer." }]);
+      setQaHistory((prev) => [
+        ...prev,
+        { question, answer: "Error getting answer." },
+      ]);
     } finally {
       setQaLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-100 to-white flex items-center justify-center p-4">
@@ -97,7 +94,9 @@ function App() {
             className="w-full border border-gray-300 rounded px-3 py-2"
           />
           {file && (
-            <p className="text-sm text-gray-500 mt-1">📎 File selected: {file.name}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              📎 File selected: {file.name}
+            </p>
           )}
         </div>
 
@@ -120,7 +119,9 @@ function App() {
         {summary && (
           <>
             <div className="mt-6">
-              <h2 className="text-xl font-semibold mb-2 text-gray-700">📌 Summary:</h2>
+              <h2 className="text-xl font-semibold mb-2 text-gray-700">
+                📌 Summary:
+              </h2>
               <div className="bg-gray-50 p-4 rounded-md border border-gray-200 max-h-60 overflow-y-auto text-sm text-gray-800 whitespace-pre-wrap">
                 {summary}
               </div>
@@ -133,7 +134,9 @@ function App() {
             </div>
 
             <div className="mt-6">
-              <h2 className="text-lg font-semibold mb-1 text-gray-700">❓ Ask a question:</h2>
+              <h2 className="text-lg font-semibold mb-1 text-gray-700">
+                ❓ Ask a question:
+              </h2>
               <input
                 type="text"
                 value={question}
@@ -155,25 +158,29 @@ function App() {
                 Clear Q&A History
               </button>
 
-
               {qaHistory.length > 0 && (
                 <div className="mt-4">
-                  <h3 className="text-md font-semibold text-gray-700 mb-2">💬 Q&A History</h3>
+                  <h3 className="text-md font-semibold text-gray-700 mb-2">
+                    💬 Q&A History
+                  </h3>
                   <div className="space-y-3 max-h-60 overflow-y-auto">
                     {qaHistory.map((qa, index) => (
                       <div key={index} className="p-3 bg-gray-100 rounded border">
-                        <p className="font-medium text-gray-800">❓ {qa.question}</p>
-                        <p className="text-sm text-gray-700 mt-1">💡 {qa.answer}</p>
+                        <p className="font-medium text-gray-800">
+                          ❓ {qa.question || <i>No question entered</i>}
+                        </p>
+                        <p className="text-sm text-gray-700 mt-1">
+                          💡 {qa.answer}
+                        </p>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
             </div>
           </>
         )}
-            <BulkQA />
+        <BulkQA />
       </div>
     </div>
   );
