@@ -25,8 +25,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
     const content = pdfData.text.slice(0, 12000);
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // ✅ No "models/" prefix
 
-    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
     const result = await model.generateContent(`Summarize the following:\n\n${content}`);
     const response = await result.response;
     const summary = response.text();
@@ -47,7 +47,9 @@ app.post("/ask", async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // ✅ No "models/" prefix
+
     const result = await model.generateContent(`Context:\n${context}\n\nQuestion: ${question}`);
     const response = await result.response;
     const answer = response.text();
@@ -78,7 +80,8 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
       .map((q) => q.trim())
       .filter((q) => q.length > 0);
 
-    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // ✅ No "models/" prefix
+
 
     const answers = [];
 
