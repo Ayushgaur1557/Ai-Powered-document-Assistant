@@ -11,27 +11,19 @@ app.use(express.json());
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"; 
-
-
-
 const API_KEY = process.env.GOOGLE_API_KEY;
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
 
+// ✅ Test Gemini Route
 app.get("/test-gemini", async (req, res) => {
   try {
     const payload = {
-      contents: [
-        {
-          parts: [{ text: "Say hello in one sentence." }],
-        },
-      ],
+      contents: [{ parts: [{ text: "Say hello in one sentence." }] }],
     };
 
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`,
-      payload,
-      { headers: { "Content-Type": "application/json" } }
-    );
+    const response = await axios.post(`${GEMINI_API_URL}?key=${API_KEY}`, payload, {
+      headers: { "Content-Type": "application/json" },
+    });
 
     const result = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
     res.send(result || "No result");
@@ -41,13 +33,12 @@ app.get("/test-gemini", async (req, res) => {
   }
 });
 
-
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.send("🟢 Backend is live and ready!");
 });
 
-// ✅ Summarization Route
+// ✅ Upload & Summarize
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
@@ -55,11 +46,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const content = pdfData.text.slice(0, 12000);
 
     const payload = {
-      contents: [
-        {
-          parts: [{ text: `Summarize the following:\n\n${content}` }],
-        },
-      ],
+      contents: [{ parts: [{ text: `Summarize the following:\n\n${content}` }] }],
     };
 
     const response = await axios.post(`${GEMINI_API_URL}?key=${API_KEY}`, payload, {
@@ -84,11 +71,7 @@ app.post("/ask", async (req, res) => {
 
   try {
     const payload = {
-      contents: [
-        {
-          parts: [{ text: `Context:\n${context}\n\nQuestion: ${question}` }],
-        },
-      ],
+      contents: [{ parts: [{ text: `Context:\n${context}\n\nQuestion: ${question}` }] }],
     };
 
     const response = await axios.post(`${GEMINI_API_URL}?key=${API_KEY}`, payload, {
@@ -113,18 +96,14 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
   try {
     const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.slice(0, 12000);
     const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
+    const questions = questionText.split(/\r?\n/).map(q => q.trim()).filter(Boolean);
 
-    const questions = questionText.split(/\r?\n/).map((q) => q.trim()).filter(Boolean);
     const answers = [];
 
     for (const question of questions) {
       try {
         const payload = {
-          contents: [
-            {
-              parts: [{ text: `Context:\n${contentText}\n\nQuestion: ${question}` }],
-            },
-          ],
+          contents: [{ parts: [{ text: `Context:\n${contentText}\n\nQuestion: ${question}` }] }],
         };
 
         const response = await axios.post(`${GEMINI_API_URL}?key=${API_KEY}`, payload, {
@@ -132,10 +111,9 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
         });
 
         const answer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No answer returned.";
-
         answers.push({ question, answer });
 
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // avoid API rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000)); // delay to avoid rate limiting
       } catch (innerErr) {
         console.error(`❌ Error for question "${question}":`, innerErr.message);
         answers.push({ question, answer: "Error processing this question." });
