@@ -58,7 +58,7 @@ app.post("/ask", async (req, res) => {
 
   try {
     const response = await axios.post(
-      "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
+      "https://api-inference.huggingface.co/models/bert-large-uncased-whole-word-masking-finetuned-squad",
       {
         inputs: {
           question,
@@ -100,30 +100,15 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
       .map(q => q.trim())
       .filter(q => q.length > 0);
 
-    const limitedContext = contentText.slice(0, 3000); // ✅ avoid model crash
-
-    // ✅ Warm-up request
-    await axios.post(
-      "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
-      {
-        inputs: {
-          question: "What is this?",
-          context: "This is a warm-up request.",
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-        },
-      }
-    );
-
+    const limitedContext = contentText.slice(0, 3000);
     const answers = [];
 
-    for (const question of questions) {
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+
       try {
         const response = await axios.post(
-          "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
+          "https://api-inference.huggingface.co/models/bert-large-uncased-whole-word-masking-finetuned-squad",
           {
             inputs: {
               question,
@@ -134,6 +119,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
             headers: {
               Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
             },
+            timeout: 20000, // 20s timeout to avoid hanging
           }
         );
 
@@ -142,12 +128,15 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           answer: response.data.answer || "No answer found.",
         });
       } catch (innerErr) {
-        console.error(`Error answering: "${question}"`, innerErr.message);
+        console.error(`Error for "${question}":`, innerErr.message);
         answers.push({
           question,
           answer: "Error processing this question.",
         });
       }
+
+      // Add delay (1.5s) to avoid rate limits
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     res.json({ answers });
@@ -157,6 +146,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     res.status(500).send("Something went wrong during bulk Q&A.");
   }
 });
+
 
 
 
