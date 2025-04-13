@@ -1,29 +1,32 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const pdfParse = require('pdf-parse');
-require('dotenv').config();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const express = require("express");
+const cors = require("cors");
+const multer = require("multer");
+const pdfParse = require("pdf-parse");
+require("dotenv").config();
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+const upload = multer({ storage: multer.memoryStorage() });
+
+// ✅ Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// ✅ Health check
 app.get("/", (req, res) => {
   res.send("🟢 Backend is live and ready!");
 });
 
-const upload = multer({ storage: multer.memoryStorage() });
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-
-// ✅ Upload & Summarize
-app.post('/upload', upload.single('file'), async (req, res) => {
+// ✅ Summarize PDF
+app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const content = pdfData.text.slice(0, 12000); // Gemini supports more input
+    const content = pdfData.text.slice(0, 12000);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
     const result = await model.generateContent(`Summarize the following:\n\n${content}`);
     const response = await result.response;
     const summary = response.text();
@@ -35,7 +38,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-// ✅ Q&A
+// ✅ Ask question
 app.post("/ask", async (req, res) => {
   const { context, question } = req.body;
 
@@ -44,7 +47,7 @@ app.post("/ask", async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
     const result = await model.generateContent(`Context:\n${context}\n\nQuestion: ${question}`);
     const response = await result.response;
     const answer = response.text();
@@ -58,8 +61,8 @@ app.post("/ask", async (req, res) => {
 
 // ✅ Bulk Q&A
 const bulkUpload = multer().fields([
-  { name: 'contentPdf', maxCount: 1 },
-  { name: 'questionsPdf', maxCount: 1 },
+  { name: "contentPdf", maxCount: 1 },
+  { name: "questionsPdf", maxCount: 1 },
 ]);
 
 app.post("/bulk-qa", bulkUpload, async (req, res) => {
@@ -72,10 +75,10 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
 
     const questions = questionText
       .split(/\r?\n/)
-      .map(q => q.trim())
-      .filter(q => q.length > 0);
+      .map((q) => q.trim())
+      .filter((q) => q.length > 0);
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Fixed
 
     const answers = [];
 
@@ -90,7 +93,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           answer: answer || "No answer returned.",
         });
 
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Optional delay
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // small delay to avoid overload
       } catch (innerErr) {
         console.error(`❌ Error for question "${question}":`, innerErr.message);
         answers.push({
@@ -107,5 +110,6 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
   }
 });
 
+// ✅ Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server started on port ${PORT}`));
