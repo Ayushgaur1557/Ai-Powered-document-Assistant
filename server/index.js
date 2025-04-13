@@ -67,7 +67,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     const contentBuffer = req.files.contentPdf[0].buffer;
     const questionBuffer = req.files.questionsPdf[0].buffer;
 
-    const contentText = (await pdfParse(contentBuffer)).text;
+    const contentText = (await pdfParse(contentBuffer)).text.slice(0, 12000);
     const questionText = (await pdfParse(questionBuffer)).text;
 
     const questions = questionText
@@ -75,27 +75,34 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
       .map(q => q.trim())
       .filter(q => q.length > 0);
 
-    const limitedContext = contentText.slice(0, 12000); // use more context since Gemini allows
-
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
     const answers = [];
 
     for (const question of questions) {
       try {
-        const result = await model.generateContent(`Context:\n${limitedContext}\n\nQuestion: ${question}`);
+        const result = await model.generateContent(`Context:\n${contentText}\n\nQuestion: ${question}`);
         const response = await result.response;
         const answer = response.text();
 
-        answers.push({ question, answer });
+        answers.push({
+          question,
+          answer: answer || "No answer returned.",
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Optional delay
       } catch (innerErr) {
-        console.error(`❌ Error on question "${question}":`, innerErr.message);
-        answers.push({ question, answer: "Error processing this question." });
+        console.error(`❌ Error for question "${question}":`, innerErr.message);
+        answers.push({
+          question,
+          answer: "Error processing this question.",
+        });
       }
     }
 
     res.json({ answers });
   } catch (err) {
-    console.error("❌ Bulk Q&A Error:", err.message);
+    console.error("❌ Bulk Q&A Gemini Error:", err.message);
     res.status(500).send("Something went wrong during bulk Q&A.");
   }
 });
