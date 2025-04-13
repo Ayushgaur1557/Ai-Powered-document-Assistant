@@ -65,7 +65,7 @@ app.post("/ask", async (req, res) => {
 
   try {
     const response = await axios.post(
-      "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
+      "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
       {
         inputs: {
           question,
@@ -78,6 +78,7 @@ app.post("/ask", async (req, res) => {
         }
       }
     );
+    
 
     const answer = response.data.answer || "Sorry, I couldn't find an answer.";
     res.json({ answer });
