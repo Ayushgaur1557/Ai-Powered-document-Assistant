@@ -1,11 +1,9 @@
-
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
-const axios = require('axios');
-require('dotenv').config();    
-
+require('dotenv').config();
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const app = express();
 app.use(cors());
@@ -15,40 +13,29 @@ app.get("/", (req, res) => {
   res.send("🟢 Backend is live and ready!");
 });
 
-
 const upload = multer({ storage: multer.memoryStorage() });
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-//post method
-
-
+// ✅ Upload & Summarize
 app.post('/upload', upload.single('file'), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
+    const content = pdfData.text.slice(0, 12000); // Gemini supports more input
 
-    // Limit content length to ~3000 characters (~600–700 tokens) to avoid model crash
-    const content = pdfData.text.slice(0, 3000);
-    
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent(`Summarize the following:\n\n${content}`);
+    const response = await result.response;
+    const summary = response.text();
 
-    const response = await axios.post(
-      "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
-      { inputs: content },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-        },
-      }
-    );
-
-    const summary = response.data[0]?.summary_text || "No summary returned.";
     res.json({ summary });
-
   } catch (err) {
-    console.error(" HuggingFace Error:", err.message);
+    console.error("Gemini Summarization Error:", err.message);
     res.status(500).send(`Something went wrong: ${err.message}`);
   }
 });
 
+// ✅ Q&A
 app.post("/ask", async (req, res) => {
   const { context, question } = req.body;
 
@@ -57,31 +44,19 @@ app.post("/ask", async (req, res) => {
   }
 
   try {
-    const response = await axios.post(
-      "https://api-inference.huggingface.co/models/bert-large-uncased-whole-word-masking-finetuned-squad",
-      {
-        inputs: {
-          question,
-          context
-        }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`
-        }
-      }
-    );
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const result = await model.generateContent(`Context:\n${context}\n\nQuestion: ${question}`);
+    const response = await result.response;
+    const answer = response.text();
 
-    const answer = response.data.answer || "Sorry, I couldn't find an answer.";
     res.json({ answer });
-  } catch (error) {
-    console.error(" QA Error:", error.message);
-    res.status(500).send(`Something went wrong: ${error.message}`);
+  } catch (err) {
+    console.error("Gemini Q&A Error:", err.message);
+    res.status(500).send(`Something went wrong: ${err.message}`);
   }
 });
 
-//posting in bulk 2 pdf one for document and 2nd for uestion
-
+// ✅ Bulk Q&A
 const bulkUpload = multer().fields([
   { name: 'contentPdf', maxCount: 1 },
   { name: 'questionsPdf', maxCount: 1 },
@@ -100,56 +75,30 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
       .map(q => q.trim())
       .filter(q => q.length > 0);
 
-    const limitedContext = contentText.slice(0, 3000);
+    const limitedContext = contentText.slice(0, 12000); // use more context since Gemini allows
+
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const answers = [];
 
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-
+    for (const question of questions) {
       try {
-        const response = await axios.post(
-          "https://api-inference.huggingface.co/models/bert-large-uncased-whole-word-masking-finetuned-squad",
-          {
-            inputs: {
-              question,
-              context: limitedContext,
-            },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-            },
-            timeout: 20000, // 20s timeout to avoid hanging
-          }
-        );
+        const result = await model.generateContent(`Context:\n${limitedContext}\n\nQuestion: ${question}`);
+        const response = await result.response;
+        const answer = response.text();
 
-        answers.push({
-          question,
-          answer: response.data.answer || "No answer found.",
-        });
+        answers.push({ question, answer });
       } catch (innerErr) {
-        console.error(`Error for "${question}":`, innerErr.message);
-        answers.push({
-          question,
-          answer: "Error processing this question.",
-        });
+        console.error(`❌ Error on question "${question}":`, innerErr.message);
+        answers.push({ question, answer: "Error processing this question." });
       }
-
-      // Add delay (1.5s) to avoid rate limits
-      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     res.json({ answers });
-
   } catch (err) {
     console.error("❌ Bulk Q&A Error:", err.message);
     res.status(500).send("Something went wrong during bulk Q&A.");
   }
 });
-
-
-
-
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server started on port ${PORT}`));
