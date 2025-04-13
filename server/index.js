@@ -8,14 +8,7 @@ require('dotenv').config();
 
 
 const app = express();
-app.use(
-  cors({
-    origin: "https://ai-powered-document-assistant.vercel.app",
-    methods: ["GET", "POST"],
-    credentials: true,
-  })
-);
-
+app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
@@ -65,7 +58,7 @@ app.post("/ask", async (req, res) => {
 
   try {
     const response = await axios.post(
-      "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
+      "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
       {
         inputs: {
           question,
@@ -78,7 +71,6 @@ app.post("/ask", async (req, res) => {
         }
       }
     );
-    
 
     const answer = response.data.answer || "Sorry, I couldn't find an answer.";
     res.json({ answer });
@@ -104,9 +96,27 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     const questionText = (await pdfParse(questionBuffer)).text;
 
     const questions = questionText
-      .split(/\r?\n/) // handles both \n and \r\n
+      .split(/\r?\n/)
       .map(q => q.trim())
       .filter(q => q.length > 0);
+
+    const limitedContext = contentText.slice(0, 3000); // ✅ avoid model crash
+
+    // ✅ Warm-up request
+    await axios.post(
+      "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
+      {
+        inputs: {
+          question: "What is this?",
+          context: "This is a warm-up request.",
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+        },
+      }
+    );
 
     const answers = [];
 
@@ -117,7 +127,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           {
             inputs: {
               question,
-              context: contentText,
+              context: limitedContext,
             },
           },
           {
