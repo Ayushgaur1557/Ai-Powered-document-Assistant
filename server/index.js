@@ -12,7 +12,10 @@ app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ✅ Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY, {
+  apiVersion: "v1"  // ✅ force v1 instead of v1beta
+});
+
 
 // ✅ Health check
 app.get("/", (req, res) => {
@@ -48,7 +51,8 @@ app.post("/ask", async (req, res) => {
 
   try {
 
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // ✅ No "models/" prefix
+    const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Full path
+
 
     const result = await model.generateContent(`Context:\n${context}\n\nQuestion: ${question}`);
     const response = await result.response;
@@ -80,7 +84,8 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
       .map((q) => q.trim())
       .filter((q) => q.length > 0);
 
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // ✅ No "models/" prefix
+      const model = genAI.getGenerativeModel({ model: "models/gemini-pro" }); // ✅ Full path
+
 
 
     const answers = [];
