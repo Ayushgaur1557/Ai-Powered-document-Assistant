@@ -15,6 +15,31 @@ const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/
 
 const API_KEY = process.env.GOOGLE_API_KEY;
 
+app.get("/test-gemini", async (req, res) => {
+  try {
+    const payload = {
+      contents: [
+        {
+          parts: [{ text: "Say hello in one sentence." }],
+        },
+      ],
+    };
+
+    const response = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+      payload,
+      { headers: { "Content-Type": "application/json" } }
+    );
+
+    const result = response.data.candidates?.[0]?.content?.parts?.[0]?.text;
+    res.send(result || "No result");
+  } catch (err) {
+    console.error("❌ Test Gemini Error:", err.response?.data || err.message);
+    res.status(500).send(err.response?.data || "Something went wrong.");
+  }
+});
+
+
 // ✅ Health Check
 app.get("/", (req, res) => {
   res.send("🟢 Backend is live and ready!");
