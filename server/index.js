@@ -20,7 +20,7 @@ app.get("/", (req, res) => {
   res.send("🟢 Backend is live and ready!");
 });
 
-// ✅ Summarization
+// ✅ Summarization Route
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
@@ -30,7 +30,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const payload = {
       contents: [
         {
-          parts: [{ text: `Summarize the following content:\n\n${content}` }],
+          parts: [{ text: `Summarize the following:\n\n${content}` }],
         },
       ],
     };
@@ -39,7 +39,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       headers: { "Content-Type": "application/json" },
     });
 
-    const summary = response.data.candidates[0].content.parts[0].text;
+    const summary = response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No summary returned.";
     res.json({ summary });
   } catch (err) {
     console.error("Gemini Summarization Error:", err.response?.data || err.message);
@@ -47,7 +47,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// ✅ Single Q&A
+// ✅ Ask a Question
 app.post("/ask", async (req, res) => {
   const { context, question } = req.body;
 
@@ -68,7 +68,7 @@ app.post("/ask", async (req, res) => {
       headers: { "Content-Type": "application/json" },
     });
 
-    const answer = response.data.candidates[0].content.parts[0].text;
+    const answer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No answer returned.";
     res.json({ answer });
   } catch (err) {
     console.error("Gemini Q&A Error:", err.response?.data || err.message);
@@ -104,11 +104,11 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           headers: { "Content-Type": "application/json" },
         });
 
-        const answer = response.data.candidates[0].content.parts[0].text;
+        const answer = response.data.candidates?.[0]?.content?.parts?.[0]?.text || "No answer returned.";
 
-        answers.push({ question, answer: answer || "No answer returned." });
+        answers.push({ question, answer });
 
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // optional delay to avoid rate limits
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // avoid API rate limits
       } catch (innerErr) {
         console.error(`❌ Error for question "${question}":`, innerErr.message);
         answers.push({ question, answer: "Error processing this question." });
