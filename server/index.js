@@ -104,41 +104,50 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     const questionText = (await pdfParse(questionBuffer)).text;
 
     const questions = questionText
-      .split(/\n|\r/)
+      .split(/\r?\n/) // handles both \n and \r\n
       .map(q => q.trim())
       .filter(q => q.length > 0);
 
     const answers = [];
 
     for (const question of questions) {
-      const response = await axios.post(
-        "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
-        {
-          inputs: {
-            question,
-            context: contentText,
+      try {
+        const response = await axios.post(
+          "https://api-inference.huggingface.co/models/distilbert-base-cased-distilled-squad",
+          {
+            inputs: {
+              question,
+              context: contentText,
+            },
           },
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
-          },
-        }
-      );
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+            },
+          }
+        );
 
-      answers.push({
-        question,
-        answer: response.data.answer || "No answer found.",
-      });
+        answers.push({
+          question,
+          answer: response.data.answer || "No answer found.",
+        });
+      } catch (innerErr) {
+        console.error(`Error answering: "${question}"`, innerErr.message);
+        answers.push({
+          question,
+          answer: "Error processing this question.",
+        });
+      }
     }
 
     res.json({ answers });
 
   } catch (err) {
-    console.error(" Bulk Q&A Error:", err.message);
+    console.error("❌ Bulk Q&A Error:", err.message);
     res.status(500).send("Something went wrong during bulk Q&A.");
   }
 });
+
 
 
 
