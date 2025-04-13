@@ -11,7 +11,7 @@ app.use(express.json());
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent";
 
 const API_KEY = process.env.GOOGLE_API_KEY;
 
@@ -26,7 +26,7 @@ app.get("/test-gemini", async (req, res) => {
     };
 
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`,
       payload,
       { headers: { "Content-Type": "application/json" } }
     );
