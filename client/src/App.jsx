@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ For navigation
+import { useNavigate } from "react-router-dom"; 
 import axios from "axios";
 import { jsPDF } from "jspdf";
 import { Toaster, toast } from "react-hot-toast";
 import BulkQA from "./BULK/BulkQA";
 
-// 💡 Your backend URL from environment
+// 💡 backend URL from environment
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function App() {
@@ -92,7 +92,7 @@ function App() {
   🚀 Go to Dashboard
 </button>
 
-      <Toaster position="top-right" /> {/* ✅ Toasts */}
+      <Toaster position="top-right" /> 
 
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-xl w-full">
         <h1 className="text-3xl font-bold text-center mb-6 text-blue-700">
