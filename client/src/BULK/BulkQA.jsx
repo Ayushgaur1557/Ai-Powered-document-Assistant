@@ -20,20 +20,11 @@ function BulkQA() {
 
     try {
       setLoading(true);
-
-      // ✅ Log URL to confirm
-      console.log("Requesting:", `${BASE_URL}/bulk-qa`);
-
-      const res = await axios.post(`${BASE_URL}/bulk-qa`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
+      const res = await axios.post(`${BASE_URL}/bulk-qa`, formData);
       setBulkAnswers(res.data.answers || []);
     } catch (err) {
-      console.error("❌ Bulk Q&A Error:", err);
-      alert("Something went wrong during bulk Q&A. Please check console.");
+      alert("Something went wrong during bulk Q&A.");
+      console.error(err);
     } finally {
       setLoading(false);
     }
