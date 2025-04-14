@@ -11,30 +11,78 @@ app.use(express.json());
 
 const upload = multer({ storage: multer.memoryStorage() });
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
-const QAModelURL = "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2";
 
-// 📌 Utility: Chunk large text into pieces
-function chunkText(text, maxChunkLength = 700) {
-  const words = text.split(" ");
-  const chunks = [];
+let fullPdfContent = ""; // 🧠 To store full content for Q&A
 
-  for (let i = 0; i < words.length; i += maxChunkLength) {
-    chunks.push(words.slice(i, i + maxChunkLength).join(" "));
+// ✅ Health Check
+app.get("/", (req, res) => {
+  res.send("🟢 Hugging Face backend with Flan-T5 is live!");
+});
+
+// ✅ Upload & Summarize (also store full content)
+app.post("/upload", upload.single("file"), async (req, res) => {
+  try {
+    const pdfBuffer = req.file.buffer;
+    const pdfData = await pdfParse(pdfBuffer);
+    
+    fullPdfContent = pdfData.text.replace(/\s+/g, " "); // Store full cleaned content
+    const summaryContent = fullPdfContent.slice(0, 3000); // Trim for summarization
+
+    const response = await axios.post(
+      "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
+      { inputs: summaryContent },
+      {
+        headers: {
+          Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
+        },
+      }
+    );
+
+    const summary = response.data[0]?.summary_text || "No summary returned.";
+    res.json({ summary });
+
+  } catch (err) {
+    console.error("Summarization Error:", err.message);
+    res.status(500).send("Something went wrong during summarization.");
+  }
+});
+
+// ✅ Single Q&A (uses stored full PDF content)
+app.post("/ask", async (req, res) => {
+  const { question } = req.body;
+
+  if (!question) {
+    return res.status(400).json({ error: "Question is required." });
   }
 
-  return chunks;
-}
+  if (!fullPdfContent) {
+    return res.status(400).json({ error: "No PDF uploaded yet." });
+  }
 
-// 📌 Utility: Score chunk by how many words from question appear
-function scoreChunk(chunk, question) {
-  const questionWords = question.toLowerCase().split(/\W+/);
-  const chunkWords = chunk.toLowerCase();
-  return questionWords.reduce((score, word) => {
-    return score + (chunkWords.includes(word) ? 1 : 0);
-  }, 0);
-}
+  try {
+    const response = await axios.post(
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
+      {
+        inputs: `Answer the following question in a short paragraph:\n\nQuestion: ${question}\nContext: ${fullPdfContent.slice(0, 5000)}`,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
+        },
+        timeout: 20000,
+      }
+    );
 
-// 📌 Helper to extract grouped questions
+    const answer = response.data?.[0]?.generated_text || "No answer returned.";
+    res.json({ answer });
+
+  } catch (err) {
+    console.error("Q&A Error:", err.message);
+    res.status(500).send("Something went wrong during Q&A.");
+  }
+});
+
+// ✅ Extract Questions Helper
 function extractQuestions(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const questions = [];
@@ -53,7 +101,7 @@ function extractQuestions(text) {
   return questions;
 }
 
-// ✅ Bulk Q&A with Chunking Logic
+// ✅ Bulk Q&A (Flan-T5)
 const bulkUpload = multer().fields([
   { name: "contentPdf", maxCount: 1 },
   { name: "questionsPdf", maxCount: 1 },
@@ -61,30 +109,18 @@ const bulkUpload = multer().fields([
 
 app.post("/bulk-qa", bulkUpload, async (req, res) => {
   try {
-    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.replace(/\s+/g, " ");
+    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.replace(/\s+/g, " ").slice(0, 5000);
     const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
     const questions = extractQuestions(questionText);
-    const chunks = chunkText(contentText);
 
     const answers = [];
 
     for (const question of questions) {
-      // ✅ Step 1: Find best chunk
-      const scoredChunks = chunks
-        .map(chunk => ({ chunk, score: scoreChunk(chunk, question) }))
-        .sort((a, b) => b.score - a.score);
-
-      const bestChunk = scoredChunks[0]?.chunk || chunks[0];
-
-      // ✅ Step 2: Ask model
       try {
         const response = await axios.post(
-          QAModelURL,
+          "https://api-inference.huggingface.co/models/google/flan-t5-large",
           {
-            inputs: {
-              context: bestChunk,
-              question: question,
-            },
+            inputs: `Answer the following question in a short paragraph:\n\nQuestion: ${question}\nContext: ${contentText}`,
           },
           {
             headers: {
@@ -94,12 +130,12 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           }
         );
 
-        const answer = response.data.answer || "No answer found.";
+        const answer = response.data?.[0]?.generated_text || "No answer returned.";
         answers.push({ question, answer });
 
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate limit
-      } catch (err) {
-        console.error(`❌ Model error for "${question}":`, err.message);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate-limit pause
+      } catch (innerErr) {
+        console.error(`❌ Error for "${question}":`, innerErr.message);
         answers.push({ question, answer: "Error processing this question." });
       }
     }
@@ -107,14 +143,11 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     res.json({ answers });
 
   } catch (err) {
-    console.error("❌ Bulk Q&A Error:", err.message);
+    console.error("Bulk Q&A Error:", err.message);
     res.status(500).send("Something went wrong during bulk Q&A.");
   }
 });
 
+// ✅ Start Server
 const PORT = process.env.PORT || 5000;
-app.get("/", (req, res) => {
-  res.send("✅ AI-Powered Document Assistant is running.");
-});
-
 app.listen(PORT, () => console.log(`✅ Server started on port ${PORT}`));
