@@ -1,5 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
+import { toast } from "react-hot-toast"; // ✅ Toast support
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -11,7 +12,7 @@ function BulkQA() {
 
   const handleBulkUpload = async () => {
     if (!contentFile || !questionsFile) {
-      return alert("Please select both content and question PDF files.");
+      return toast.error("Please select both content and question PDF files.");
     }
 
     const formData = new FormData();
@@ -20,10 +21,15 @@ function BulkQA() {
 
     try {
       setLoading(true);
-      const res = await axios.post(`${BASE_URL}/bulk-qa`, formData);
+      const res = await axios.post(`${BASE_URL}/bulk-qa`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
       setBulkAnswers(res.data.answers || []);
+      toast.success("✅ Answers received!");
     } catch (err) {
-      alert("Something went wrong during bulk Q&A.");
+      toast.error("Something went wrong during bulk Q&A.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -38,7 +44,14 @@ function BulkQA() {
         <input
           type="file"
           accept=".pdf"
-          onChange={(e) => setContentFile(e.target.files[0])}
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file && file.size > 10 * 1024 * 1024) {
+              toast.error("Content PDF too large (max 10MB).");
+              return;
+            }
+            setContentFile(file);
+          }}
           className="w-full border border-gray-300 rounded px-3 py-2"
         />
         <p className="text-sm text-gray-500">
@@ -48,7 +61,14 @@ function BulkQA() {
         <input
           type="file"
           accept=".pdf"
-          onChange={(e) => setQuestionsFile(e.target.files[0])}
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file && file.size > 10 * 1024 * 1024) {
+              toast.error("Questions PDF too large (max 10MB).");
+              return;
+            }
+            setQuestionsFile(file);
+          }}
           className="w-full border border-gray-300 rounded px-3 py-2"
         />
         <p className="text-sm text-gray-500">
@@ -57,10 +77,34 @@ function BulkQA() {
 
         <button
           onClick={handleBulkUpload}
-          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition"
+          className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 transition flex items-center justify-center gap-2"
           disabled={loading}
         >
-          {loading ? "Processing..." : "Submit for Bulk Q&A"}
+          {loading ? (
+            <>
+              <svg
+                className="animate-spin h-5 w-5 text-white"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8H4z"
+                ></path>
+              </svg>
+              Processing...
+            </>
+          ) : (
+            "Submit for Bulk Q&A"
+          )}
         </button>
       </div>
 

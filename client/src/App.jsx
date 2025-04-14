@@ -1,9 +1,10 @@
 import { useState } from "react";
 import axios from "axios";
 import { jsPDF } from "jspdf";
+import { Toaster, toast } from "react-hot-toast"; // ✅ Import toast
 import BulkQA from "./BULK/BulkQA";
 
-// 💡 Your backend URL from Vercel environment variable
+// 💡 Your backend URL from environment
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function App() {
@@ -15,21 +16,18 @@ function App() {
   const [qaLoading, setQaLoading] = useState(false);
 
   const handleUpload = async () => {
-    if (!file) return alert("Please select a PDF file.");
+    if (!file) return toast.error("Please select a PDF file.");
     const formData = new FormData();
     formData.append("file", file);
 
     try {
       setLoading(true);
-
-      // 🟡 Warm-up: ping backend before sending actual upload request
-      await axios.get(`${BASE_URL}`);
-
-      // 🟢 Now send the real request
+      await axios.get(`${BASE_URL}`); // Warmup ping
       const res = await axios.post(`${BASE_URL}/upload`, formData);
       setSummary(res.data.summary);
+      toast.success("Summary generated successfully!");
     } catch (err) {
-      alert("Something went wrong while summarizing.");
+      toast.error("Something went wrong while summarizing.");
       console.error(err);
     } finally {
       setLoading(false);
@@ -53,7 +51,7 @@ function App() {
   };
 
   const handleAsk = async () => {
-    if (!question.trim()) return alert("Please enter a question.");
+    if (!question.trim()) return toast.error("Please enter a question.");
     setQaLoading(true);
     try {
       const res = await axios.post(`${BASE_URL}/ask`, {
@@ -67,7 +65,7 @@ function App() {
       };
 
       setQaHistory((prev) => [...prev, newQA]);
-      setQuestion(""); // Clear input
+      setQuestion("");
     } catch (err) {
       console.error(err);
       setQaHistory((prev) => [
@@ -81,6 +79,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-100 to-white flex items-center justify-center p-4">
+      <Toaster position="top-right" /> {/* ✅ Toasts */}
+
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-xl w-full">
         <h1 className="text-3xl font-bold text-center mb-6 text-blue-700">
           📄 AI PDF Summarizer + Q&A
@@ -90,7 +90,14 @@ function App() {
           <input
             type="file"
             accept=".pdf"
-            onChange={(e) => setFile(e.target.files[0])}
+            onChange={(e) => {
+              const file = e.target.files[0];
+              if (file && file.size > 10 * 1024 * 1024) {
+                toast.error("File too large. Max allowed is 10MB.");
+                return;
+              }
+              setFile(file);
+            }}
             className="w-full border border-gray-300 rounded px-3 py-2"
           />
           {file && (
@@ -134,18 +141,13 @@ function App() {
             <div className="mt-6">
               <h2 className="text-lg font-semibold mb-1 text-gray-700">❓ Ask a question:</h2>
 
-              {/* ✅ Updated input styling */}
-         <input
-  type="text"
-  value={question}
-  onChange={(e) => setQuestion(e.target.value)}
-  placeholder="Type your question..."
-  className="w-full px-4 py-2 mb-2 rounded border border-gray-400 bg-white text-black placeholder-gray-500"
-/>
-
-
-
-
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Type your question..."
+                className="w-full px-4 py-2 mb-2 rounded border border-gray-400 bg-white text-black placeholder-gray-500"
+              />
 
               <button
                 onClick={handleAsk}
@@ -181,11 +183,11 @@ function App() {
             </div>
           </>
         )}
+
         <BulkQA />
       </div>
     </div>
   );
-
 }
 
 export default App;
