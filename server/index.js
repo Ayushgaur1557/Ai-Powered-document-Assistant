@@ -15,7 +15,7 @@ const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
 // ✅ Health Check
 app.get("/", (req, res) => {
-  res.send("🟢 Hugging Face backend is live!");
+  res.send("🟢 Hugging Face backend with Flan-T5 is live!");
 });
 
 // ✅ Summarization
@@ -43,7 +43,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// ✅ Single Q&A
+// ✅ Single Q&A (with Flan-T5)
 app.post("/ask", async (req, res) => {
   const { context, question } = req.body;
 
@@ -53,21 +53,19 @@ app.post("/ask", async (req, res) => {
 
   try {
     const response = await axios.post(
-      "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
+      "https://api-inference.huggingface.co/models/google/flan-t5-large",
       {
-        inputs: {
-          context,
-          question: `Answer this in one short paragraph:\n${question}`,
-        },
+        inputs: `Question: ${question}\nContext: ${context}`,
       },
       {
         headers: {
           Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
         },
+        timeout: 20000,
       }
     );
 
-    const answer = response.data.answer || "Sorry, I couldn't find an answer.";
+    const answer = response.data?.[0]?.generated_text || "No answer returned.";
     res.json({ answer });
   } catch (err) {
     console.error("Q&A Error:", err.message);
@@ -75,7 +73,7 @@ app.post("/ask", async (req, res) => {
   }
 });
 
-// ✅ Helper to extract properly grouped questions
+// ✅ Question grouping helper
 function extractQuestions(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const questions = [];
@@ -94,7 +92,7 @@ function extractQuestions(text) {
   return questions;
 }
 
-// ✅ Bulk Q&A
+// ✅ Bulk Q&A (with Flan-T5)
 const bulkUpload = multer().fields([
   { name: "contentPdf", maxCount: 1 },
   { name: "questionsPdf", maxCount: 1 },
@@ -102,7 +100,7 @@ const bulkUpload = multer().fields([
 
 app.post("/bulk-qa", bulkUpload, async (req, res) => {
   try {
-    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.slice(0, 3000);
+    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.slice(0, 5000);
     const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
 
     const questions = extractQuestions(questionText);
@@ -113,12 +111,9 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
     for (const question of questions) {
       try {
         const response = await axios.post(
-          "https://api-inference.huggingface.co/models/deepset/roberta-base-squad2",
+          "https://api-inference.huggingface.co/models/google/flan-t5-large",
           {
-            inputs: {
-              context: contentText,
-              question: `Answer in a clear short paragraph:\n${question}`,
-            },
+            inputs: `Question: ${question}\nContext: ${contentText}`,
           },
           {
             headers: {
@@ -128,10 +123,10 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
           }
         );
 
-        const answer = response.data.answer || "No answer found.";
+        const answer = response.data?.[0]?.generated_text || "No answer returned.";
         answers.push({ question, answer });
 
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate-limit pause
       } catch (err) {
         console.error(`❌ Error for "${question}":`, err.message);
         answers.push({ question, answer: "Error processing this question." });
