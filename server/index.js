@@ -12,7 +12,8 @@ app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 
 const API_KEY = process.env.GOOGLE_API_KEY;
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta1/models/gemini-pro:generateContent"; // Example - verify the actual URL
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+
 
 
 // ✅ Test Gemini Route
