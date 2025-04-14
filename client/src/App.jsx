@@ -85,12 +85,13 @@ function App() {
 
     <div className="min-h-screen bg-gradient-to-b from-gray-100 to-white flex items-center justify-center p-4">
 
-      <button
-        onClick={() => navigate('/dashboard')}
-        className="mt-4 bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
-      >
-        🚀 Go to Dashboard
-      </button>
+<button
+  onClick={() => navigate('/dashboard')}
+  className="mb-4 bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-800"
+>
+  🚀 Go to Dashboard
+</button>
+
       <Toaster position="top-right" /> {/* ✅ Toasts */}
 
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-xl w-full">
