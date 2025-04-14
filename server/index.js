@@ -18,12 +18,16 @@ app.get("/", (req, res) => {
   res.send("🟢 Hugging Face backend with Flan-T5 is live!");
 });
 
-// ✅ Summarization
+// ✅ Summarization (cleaned)
 app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const content = pdfData.text.slice(0, 3000);
+    
+    const content = pdfData.text
+      .replace(/[^a-zA-Z0-9\s.,?!'"()\-]/g, "") // remove non-text
+      .replace(/\s+/g, " ")                     // collapse extra spaces
+      .slice(0, 3000);                          // model limit
 
     const response = await axios.post(
       "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
@@ -38,12 +42,12 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const summary = response.data[0]?.summary_text || "No summary returned.";
     res.json({ summary });
   } catch (err) {
-    console.error("Summarization Error:", err.message);
-    res.status(500).send(`Something went wrong: ${err.message}`);
+    console.error("Summarization Error:", err.response?.data || err.message);
+    res.status(500).send("Something went wrong during summarization.");
   }
 });
 
-// ✅ Single Q&A (with Flan-T5)
+// ✅ Single Q&A (Flan-T5)
 app.post("/ask", async (req, res) => {
   const { context, question } = req.body;
 
@@ -55,7 +59,7 @@ app.post("/ask", async (req, res) => {
     const response = await axios.post(
       "https://api-inference.huggingface.co/models/google/flan-t5-large",
       {
-        inputs: `Question: ${question}\nContext: ${context}`,
+        inputs: `Answer the following question in a short paragraph:\n\nQuestion: ${question}\nContext: ${context}`,
       },
       {
         headers: {
@@ -68,12 +72,12 @@ app.post("/ask", async (req, res) => {
     const answer = response.data?.[0]?.generated_text || "No answer returned.";
     res.json({ answer });
   } catch (err) {
-    console.error("Q&A Error:", err.message);
+    console.error("Q&A Error:", err.response?.data || err.message);
     res.status(500).send("Something went wrong during Q&A.");
   }
 });
 
-// ✅ Question grouping helper
+// ✅ Question Extraction Helper
 function extractQuestions(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const questions = [];
@@ -92,7 +96,7 @@ function extractQuestions(text) {
   return questions;
 }
 
-// ✅ Bulk Q&A (with Flan-T5)
+// ✅ Bulk Q&A
 const bulkUpload = multer().fields([
   { name: "contentPdf", maxCount: 1 },
   { name: "questionsPdf", maxCount: 1 },
@@ -100,10 +104,13 @@ const bulkUpload = multer().fields([
 
 app.post("/bulk-qa", bulkUpload, async (req, res) => {
   try {
-    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.slice(0, 5000);
-    const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
+    const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text
+      .replace(/\s+/g, " ")
+      .slice(0, 5000);
 
+    const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
     const questions = extractQuestions(questionText);
+
     console.log("📌 Parsed Questions:", questions);
 
     const answers = [];
@@ -113,7 +120,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
         const response = await axios.post(
           "https://api-inference.huggingface.co/models/google/flan-t5-large",
           {
-            inputs: `Question: ${question}\nContext: ${contentText}`,
+            inputs: `Answer the following question in a short paragraph:\n\nQuestion: ${question}\nContext: ${contentText}`,
           },
           {
             headers: {
@@ -126,9 +133,9 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
         const answer = response.data?.[0]?.generated_text || "No answer returned.";
         answers.push({ question, answer });
 
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate-limit pause
-      } catch (err) {
-        console.error(`❌ Error for "${question}":`, err.message);
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate limit
+      } catch (innerErr) {
+        console.error(`❌ Error for "${question}":`, innerErr.message);
         answers.push({ question, answer: "Error processing this question." });
       }
     }
@@ -140,5 +147,6 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
   }
 });
 
+// ✅ Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server started on port ${PORT}`));
