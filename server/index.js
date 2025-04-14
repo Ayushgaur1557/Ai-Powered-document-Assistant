@@ -113,4 +113,8 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+app.get("/", (req, res) => {
+  res.send("✅ AI-Powered Document Assistant is running.");
+});
+
 app.listen(PORT, () => console.log(`✅ Server started on port ${PORT}`));
