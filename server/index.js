@@ -12,7 +12,7 @@ app.use(express.json());
 const upload = multer({ storage: multer.memoryStorage() });
 const HUGGINGFACE_API_KEY = process.env.HUGGINGFACE_API_KEY;
 
-let fullPdfContent = ""; // 🧠 Full context stored here
+let fullPdfContent = ""; // 🧠 To store full content for Q&A
 
 // ✅ Health Check
 app.get("/", (req, res) => {
@@ -24,12 +24,9 @@ app.post("/upload", upload.single("file"), async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-
-    // Clean and store full content
-    fullPdfContent = pdfData.text.replace(/\s+/g, " ").trim();
-
-    // Use more context (up to 7000 chars), but not the entire file to avoid API failure
-    const summaryContent = fullPdfContent.slice(0, 7000);
+    
+    fullPdfContent = pdfData.text.replace(/\s+/g, " "); // Store full cleaned content
+    const summaryContent = fullPdfContent.slice(0, 3000); // Trim for summarization
 
     const response = await axios.post(
       "https://api-inference.huggingface.co/models/facebook/bart-large-cnn",
@@ -38,20 +35,19 @@ app.post("/upload", upload.single("file"), async (req, res) => {
         headers: {
           Authorization: `Bearer ${HUGGINGFACE_API_KEY}`,
         },
-        timeout: 25000,
       }
     );
 
-    const summary = response.data?.[0]?.summary_text || "No summary returned.";
+    const summary = response.data[0]?.summary_text || "No summary returned.";
     res.json({ summary });
 
   } catch (err) {
-    console.error("Summarization Error:", err.response?.data || err.message);
+    console.error("Summarization Error:", err.message);
     res.status(500).send("Something went wrong during summarization.");
   }
 });
 
-// ✅ Single Q&A
+// ✅ Single Q&A (uses stored full PDF content)
 app.post("/ask", async (req, res) => {
   const { question } = req.body;
 
@@ -81,7 +77,7 @@ app.post("/ask", async (req, res) => {
     res.json({ answer });
 
   } catch (err) {
-    console.error("Q&A Error:", err.response?.data || err.message);
+    console.error("Q&A Error:", err.message);
     res.status(500).send("Something went wrong during Q&A.");
   }
 });
@@ -105,7 +101,7 @@ function extractQuestions(text) {
   return questions;
 }
 
-// ✅ Bulk Q&A
+// ✅ Bulk Q&A (Flan-T5)
 const bulkUpload = multer().fields([
   { name: "contentPdf", maxCount: 1 },
   { name: "questionsPdf", maxCount: 1 },
@@ -115,8 +111,8 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
   try {
     const contentText = (await pdfParse(req.files.contentPdf[0].buffer)).text.replace(/\s+/g, " ").slice(0, 5000);
     const questionText = (await pdfParse(req.files.questionsPdf[0].buffer)).text;
-
     const questions = extractQuestions(questionText);
+
     const answers = [];
 
     for (const question of questions) {
@@ -137,7 +133,7 @@ app.post("/bulk-qa", bulkUpload, async (req, res) => {
         const answer = response.data?.[0]?.generated_text || "No answer returned.";
         answers.push({ question, answer });
 
-        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate-limiting
+        await new Promise(resolve => setTimeout(resolve, 1500)); // Rate-limit pause
       } catch (innerErr) {
         console.error(`❌ Error for "${question}":`, innerErr.message);
         answers.push({ question, answer: "Error processing this question." });
