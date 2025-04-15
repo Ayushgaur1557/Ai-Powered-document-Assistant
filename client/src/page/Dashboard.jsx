@@ -8,9 +8,11 @@ function Dashboard() {
 
   return (
   
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-6 flex items-start">
 
-<div className="max-w-7xl mx-auto">
+
+<div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 mr-8 mt-4">
+
 
       {/* Top Header */}
       <div className="flex items-center justify-between mb-6">
