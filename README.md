@@ -36,7 +36,8 @@ And more!
 
 ## 🔗 Live Demo
 
-🚀 [View Live Project](ai-powered-document-assistant-git-main-ayush-gaur-s-projects.vercel.app) — Hosted on  Vercel / Render
+🚀 [View Live Project](https://ai-powered-document-assistant-git-main-ayush-gaur-s-projects.vercel.app
+) — Hosted on  Vercel / Render
 
 ---
 
